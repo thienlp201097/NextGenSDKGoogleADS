@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<defaultsMap>
+    <entry>
+        <key>inter_config</key>
+        <value>0</value>
+    </entry>
+    <entry>
+        <key>ad_config</key>
+        <value>2</value>
+    </entry>
+    <entry>
+        <key>banner_enabled</key>
+        <value>true</value>
+    </entry>
+    <entry>
+        <key>max_retry</key>
+        <value>3</value>
+    </entry>
+    <entry>
+        <key>max_retry1</key>
+        <value>3</value>
+    </entry>
+
+
+</defaultsMap>
