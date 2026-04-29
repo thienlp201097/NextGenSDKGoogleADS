@@ -39,12 +39,13 @@ android {
     }
 }
 
+// GitHub Packages returns 422 if this exact (groupId, artifactId, version) was already published — bump version or delete the package version on GitHub.
 publishing {
     publications {
         create<MavenPublication>("release") {
             groupId = "com.detech.ads"
             artifactId = "nextGenLib"
-            version = "1.0.1"
+            version = (project.findProperty("nextgenlib.version") as String?) ?: "1.0.1"
 
             afterEvaluate {
                 from(components["release"])
