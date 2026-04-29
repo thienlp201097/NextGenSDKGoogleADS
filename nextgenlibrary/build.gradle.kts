@@ -1,5 +1,3 @@
-import javax.xml.parsers.DocumentBuilderFactory
-
 plugins {
     alias(libs.plugins.android.library)
     alias(libs.plugins.jetbrains.kotlin.android)
@@ -37,15 +35,25 @@ android {
         buildConfig = true
         viewBinding = true
     }
+
+    // Required for AGP 8+ so components["release"] produces a valid Maven publication (avoids odd server errors).
+    publishing {
+        singleVariant("release") {
+            withSourcesJar()
+        }
+    }
 }
 
-// GitHub Packages returns 422 if this exact (groupId, artifactId, version) was already published — bump version or delete the package version on GitHub.
+// GitHub Packages 422: almost always "this version already exists" — bump version or delete the version on GitHub → Packages.
 publishing {
     publications {
         create<MavenPublication>("release") {
             groupId = "com.detech.ads"
             artifactId = "nextGenLib"
-            version = (project.findProperty("nextgenlib.version") as String?) ?: "1.0.1"
+            version =
+                System.getenv("NEXTGENLIB_VERSION")
+                    ?: (project.findProperty("nextgenlib.version") as String?)
+                    ?: "1.0.0"
 
             afterEvaluate {
                 from(components["release"])
@@ -57,8 +65,17 @@ publishing {
             name = "GitHubPackages"
             url = uri("https://maven.pkg.github.com/thienlp201097/NextGenSDKGoogleADS")
             credentials {
-                username = project.findProperty("gpr.user") as String? ?: System.getenv("USERNAME")
-                password = project.findProperty("gpr.key") as String? ?: System.getenv("TOKEN")
+                username =
+                    project.findProperty("gpr.user") as String?
+                        ?: System.getenv("GPR_USER")
+                        ?: System.getenv("GITHUB_ACTOR")
+                        ?: ""
+                password =
+                    project.findProperty("gpr.key") as String?
+                        ?: System.getenv("GPR_TOKEN")
+                        ?: System.getenv("TOKEN")
+                        ?: System.getenv("GITHUB_TOKEN")
+                        ?: ""
             }
         }
     }
