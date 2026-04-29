@@ -48,7 +48,7 @@ android {
 publishing {
     publications {
         create<MavenPublication>("release") {
-            groupId = "com.detech.ads"
+            groupId = "com.ads"
             artifactId = "nextGenLib"
             version =
                 System.getenv("NEXTGENLIB_VERSION")
