@@ -96,7 +96,7 @@ dependencies {
     implementation(libs.material)
     implementation(libs.androidx.activity)
     implementation(libs.androidx.constraintlayout)
-    implementation(project (":dktlibrary"))
+    implementation(project(":nextgenlibrary"))
     implementation("com.applovin:applovin-sdk:13.5.0")
     implementation("com.google.android.libraries.ads.mobile.sdk:ads-mobile-sdk:1.0.0")
     implementation("com.google.firebase:firebase-messaging-ktx:24.1.2")

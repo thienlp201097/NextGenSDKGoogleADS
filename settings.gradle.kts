@@ -29,4 +29,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "NextGenDetechAds"
 include(":app")
-include(":dktlibrary")
+include(":nextgenlibrary")
