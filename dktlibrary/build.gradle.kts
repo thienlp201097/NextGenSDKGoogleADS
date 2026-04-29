@@ -42,9 +42,9 @@ android {
 publishing {
     publications {
         create<MavenPublication>("release") {
-            groupId = "com.detech"
+            groupId = "com.detech.ads"
             artifactId = "nextGenLib"
-            version = "1.0.0"
+            version = "1.0.1"
 
             afterEvaluate {
                 from(components["release"])
@@ -54,7 +54,7 @@ publishing {
     repositories {
         maven {
             name = "GitHubPackages"
-            url = uri("https://maven.pkg.github.com/thienlp201097/DetechLib")
+            url = uri("https://maven.pkg.github.com/thienlp201097/NextGenSDKGoogleADS")
             credentials {
                 username = project.findProperty("gpr.user") as String? ?: System.getenv("USERNAME")
                 password = project.findProperty("gpr.key") as String? ?: System.getenv("TOKEN")

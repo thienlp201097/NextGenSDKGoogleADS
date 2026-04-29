@@ -23,6 +23,8 @@ import androidx.lifecycle.ProcessLifecycleOwner
 import com.ads.detech.NativeFunc.Companion.populateNativeAdView
 import com.ads.detech.NativeFunc.Companion.populateNativeAdViewClose
 import com.ads.detech.ads.AdsHolder.TAG
+import com.ads.detech.track.TenjinSDKUtil
+import com.ads.detech.track.TiktokSDKUtils
 import com.ads.detech.utils.SweetAlert.SweetAlertDialog
 import com.ads.detech.utils.admod.BannerHolderAdmob
 import com.ads.detech.utils.admod.InterHolderAdmob
@@ -68,10 +70,17 @@ import com.google.android.libraries.ads.mobile.sdk.rewarded.RewardedAd
 import com.google.android.libraries.ads.mobile.sdk.rewarded.RewardedAdEventCallback
 import com.google.android.libraries.ads.mobile.sdk.rewardedinterstitial.RewardedInterstitialAd
 import com.google.android.libraries.ads.mobile.sdk.rewardedinterstitial.RewardedInterstitialAdEventCallback
+import com.reyun.solar.engine.SolarEngineManager
+import com.reyun.solar.engine.infos.SEAdImpEventModel
+import com.tiktok.TikTokBusinessSdk
+import com.tiktok.appevents.base.TTAdRevenueEvent
+import com.tiktok.appevents.base.TTBaseEvent
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import org.json.JSONException
+import org.json.JSONObject
 import java.security.MessageDigest
 import java.security.NoSuchAlgorithmException
 import java.util.Date
@@ -205,86 +214,88 @@ object AdmobUtils {
     }
     @JvmStatic
     fun adImpressionSolarEngineSDK(adValue: AdValue, adUnitId: String, adFormat: Int, responseInfo : ResponseInfo?){
-//        TiktokSDKUtils.tiktokTrackEvent()
-//
-//        val valueMicros: Long = adValue.valueMicros
-//        val currencyCode: String = adValue.currencyCode
-//        Log.d("==SolarEngine==", "adImpressionSolarEngineSDK: $valueMicros")
-//        // Get the ad unit ID.
-//        val adSourceName: String = responseInfo?.loadedAdapterResponseInfo?.adSourceName.toString()
-//        val adSourceId: String = responseInfo?.loadedAdapterResponseInfo?.adSourceId.toString()
-//        //SE SDK processing logic
-//        val seAdImpEventModel: SEAdImpEventModel = SEAdImpEventModel()
-//        //Monetization Platform Name
-//        seAdImpEventModel.setAdNetworkPlatform(adSourceName)
-//        //Mediation Platform Name (e.g. admob SDK as "admob")
-//        seAdImpEventModel.setMediationPlatform("admob")
-//        //Displayed Ad Type (Taking Rewarded Ad as an example, adType = 1)
-//        seAdImpEventModel.setAdType(adFormat)
-//        //Monetization Platform App ID
-//        seAdImpEventModel.setAdNetworkAppID(adSourceId)
-//        //Monetization Platform Ad Unit ID
-//        seAdImpEventModel.setAdNetworkADID(adUnitId)
-//        //Ad eCPM
-//        seAdImpEventModel.setEcpm((valueMicros / 1000).toDouble())
-//        //Monetization Platform Currency Type
-//        seAdImpEventModel.setCurrencyType(currencyCode)
-//        //True: rendered success
-//        seAdImpEventModel.setRenderSuccess(true)
-//        //You can add custom properties as needed. Here we do m not give examples.
-//        SolarEngineManager.getInstance().trackAdImpression(seAdImpEventModel)
-//
-//        val adRevenueJson = JSONObject()
-//
-//        val value = adValue.valueMicros
-//        val precisionType = adValue.precisionType
-//        val adUnitId = adUnitId
-//        var adSourceInstanceName = ""
-//        var adSourceInstanceId = ""
-//
-//        responseInfo?.loadedAdapterResponseInfo?.let {
-//            adSourceInstanceName = it.adSourceInstanceName
-//            adSourceInstanceId = it.adSourceInstanceId
-//        }
-//        try {
-//            adRevenueJson.put("value", value)
-//            adRevenueJson.put("currency_code", currencyCode)
-//            adRevenueJson.put("precision_type", precisionType)
-//            adRevenueJson.put("ad_unit_id", adUnitId)
-//            adRevenueJson.put("ad_source_name", adSourceName)
-//            adRevenueJson.put("ad_source_id", adSourceId)
-//            adRevenueJson.put("ad_source_instance_name", adSourceInstanceName)
-//            adRevenueJson.put("ad_source_instance_id", adSourceInstanceId)
-//            adRevenueJson.put("device_ad_mediation_platform", "admob_sdk")
-//            adRevenueJson.put("mediation_adapter_class_name", responseInfo?.loadedAdapterResponseInfo?.adapterClassName)
-//            adRevenueJson.put("value_micros", valueMicros)
-//            adRevenueJson.put("response_id", adSourceId)
-//            val adFormat2 = when(adFormat){
-//                6->{
-//                    "splash"
-//                }
-//                0->{
-//                    "banner"
-//                }
-//                4->{
-//                    "native"
-//                }
-//                1->{
-//                    "inter"
-//                }
-//                else -> {
-//                    "ads"
-//                }
-//            }
-//            TenjinSDKUtil.instance.eventAdImpressionAdMob(adRevenueJson)
-//            // banner / interstitial / rewarded / rewarded_interstitial / native / splash
-//            adRevenueJson.put("ad_format", adFormat2)
-//        } catch (e: JSONException) {
-//            e.printStackTrace()
-//        }
-//// Make sure the App Events SDK has been initialized before calling this
-//        val adRevenueInfo: TTBaseEvent = TTAdRevenueEvent.newBuilder(adRevenueJson).build()
-//        TikTokBusinessSdk.trackTTEvent(adRevenueInfo)
+        Log.d("==ADSSSS==", "adImpressionSolarEngineSDK: ${responseInfo?.loadedAdSourceResponseInfo?.toString()}")
+        responseInfo?.loadedAdSourceResponseInfo?.toString()
+        TiktokSDKUtils.tiktokTrackEvent()
+
+        val valueMicros: Long = adValue.valueMicros
+        val currencyCode: String = adValue.currencyCode
+        Log.d("==SolarEngine==", "adImpressionSolarEngineSDK: $valueMicros")
+        // Get the ad unit ID.
+        val adSourceName: String = responseInfo?.loadedAdSourceResponseInfo?.name.toString()
+        val adSourceId: String = responseInfo?.loadedAdSourceResponseInfo?.id.toString()
+        //SE SDK processing logic
+        val seAdImpEventModel: SEAdImpEventModel = SEAdImpEventModel()
+        //Monetization Platform Name
+        seAdImpEventModel.setAdNetworkPlatform(adSourceName)
+        //Mediation Platform Name (e.g. admob SDK as "admob")
+        seAdImpEventModel.setMediationPlatform("admob")
+        //Displayed Ad Type (Taking Rewarded Ad as an example, adType = 1)
+        seAdImpEventModel.setAdType(adFormat)
+        //Monetization Platform App ID
+        seAdImpEventModel.setAdNetworkAppID(adSourceId)
+        //Monetization Platform Ad Unit ID
+        seAdImpEventModel.setAdNetworkADID(adUnitId)
+        //Ad eCPM
+        seAdImpEventModel.setEcpm((valueMicros / 1000).toDouble())
+        //Monetization Platform Currency Type
+        seAdImpEventModel.setCurrencyType(currencyCode)
+        //True: rendered success
+        seAdImpEventModel.setRenderSuccess(true)
+        //You can add custom properties as needed. Here we do m not give examples.
+        SolarEngineManager.getInstance().trackAdImpression(seAdImpEventModel)
+
+        val adRevenueJson = JSONObject()
+
+        val value = adValue.valueMicros
+        val precisionType = adValue.precisionType
+        val adUnitId = adUnitId
+        var adSourceInstanceName = ""
+        var adSourceInstanceId = ""
+
+        responseInfo?.loadedAdSourceResponseInfo?.let {
+            adSourceInstanceName = it.instanceName
+            adSourceInstanceId = it.instanceId
+        }
+        try {
+            adRevenueJson.put("value", value)
+            adRevenueJson.put("currency_code", currencyCode)
+            adRevenueJson.put("precision_type", precisionType)
+            adRevenueJson.put("ad_unit_id", adUnitId)
+            adRevenueJson.put("ad_source_name", adSourceName)
+            adRevenueJson.put("ad_source_id", adSourceId)
+            adRevenueJson.put("ad_source_instance_name", adSourceInstanceName)
+            adRevenueJson.put("ad_source_instance_id", adSourceInstanceId)
+            adRevenueJson.put("device_ad_mediation_platform", "admob_sdk")
+            adRevenueJson.put("mediation_adapter_class_name", responseInfo?.loadedAdSourceResponseInfo?.adapterClassName)
+            adRevenueJson.put("value_micros", valueMicros)
+            adRevenueJson.put("response_id", adSourceId)
+            val adFormat2 = when(adFormat){
+                6->{
+                    "splash"
+                }
+                0->{
+                    "banner"
+                }
+                4->{
+                    "native"
+                }
+                1->{
+                    "inter"
+                }
+                else -> {
+                    "ads"
+                }
+            }
+            TenjinSDKUtil.instance.eventAdImpressionAdMob(adRevenueJson)
+            // banner / interstitial / rewarded / rewarded_interstitial / native / splash
+            adRevenueJson.put("ad_format", adFormat2)
+        } catch (e: JSONException) {
+            e.printStackTrace()
+        }
+// Make sure the App Events SDK has been initialized before calling this
+        val adRevenueInfo: TTBaseEvent = TTAdRevenueEvent.newBuilder(adRevenueJson).build()
+        TikTokBusinessSdk.trackTTEvent(adRevenueInfo)
     }
 
     fun initListIdTest() {
