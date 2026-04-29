@@ -59,7 +59,6 @@ class MainActivity : AppCompatActivity() {
         binding.loadAndShowReward.setOnClickListener {
             AdmobUtils.loadAndShowRewardedInterstitialAdWithCallback(this,"",object : RewardAdCallback{
                 override fun onAdClosed() {
-                    
                 }
 
                 override fun onAdShowed() {
