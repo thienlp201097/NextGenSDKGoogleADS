@@ -22,10 +22,11 @@ import java.util.concurrent.atomic.AtomicBoolean
 @SuppressLint("CustomSplashScreen")
 class SplashActivity : AppCompatActivity() {
     val isInitAds = AtomicBoolean(false)
+    val binding by lazy { ActivitySplashBinding.inflate(layoutInflater) }
+
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        val binding = ActivitySplashBinding.inflate(layoutInflater)
         setContentView(binding.root)
         AdsManager.initNativeLayouts(listOf(
             R.layout.ad_template_medium,//native big
@@ -51,29 +52,33 @@ class SplashActivity : AppCompatActivity() {
                     return
                 }
                 isInitAds.set(true)
-                val googleMobileAdsConsentManager = GoogleMobileAdsConsentManager(this@SplashActivity)
-                googleMobileAdsConsentManager.gatherConsent { error ->
+                val googleMobileAdsConsentManager = GoogleMobileAdsConsentManager.getInstance(this@SplashActivity)
+                googleMobileAdsConsentManager.gatherConsent(this@SplashActivity) { error ->
                     error?.let {
+
                     }
-
-                    AdmobUtils.initAdmob(this@SplashActivity,"ca-app-pub-6315271820521359~2679177183", isDebug = true, isEnableAds = true,false, object : MobileAdsListener {
-                        override fun onSuccess() {
-                            Log.d("==initAdmob==", "initAdmob onSuccess: ")
-                            AppOpenManager.getInstance().init(application, getString(R.string.test_ads_admob_app_open_new))
-                            AppOpenManager.getInstance().disableAppResumeWithActivity(SplashActivity::class.java)
-                            AppOpenManager.getInstance().setTestAds(false)
-
-
-
-                            AdsManager.preloadNative(this@SplashActivity,"native_preload")
-                            AdsManager.showAdsSplash(this@SplashActivity,RemoteConfig.AD_CONFIG,binding.frBanner,R.layout.ad_native_fullscreen){
-                                Utils.getInstance().replaceActivity(this@SplashActivity, MainActivity::class.java)
-                            }
-
-                        }
-                    })
+                    if (googleMobileAdsConsentManager.canRequestAds) {
+                        initAds()
+                    } else {
+                        // fallback (hiếm)
+                        initAds()
+                    }
                 }
+            }
+        })
+    }
 
+    fun initAds(){
+        AdmobUtils.initAdmob(this@SplashActivity,"ca-app-pub-6315271820521359~2679177183", isDebug = true, isEnableAds = true,false, object : MobileAdsListener {
+            override fun onSuccess() {
+                Log.d("==initAdmob==", "initAdmob onSuccess: ")
+                AppOpenManager.getInstance().init(application, getString(R.string.test_ads_admob_app_open_new))
+                AppOpenManager.getInstance().disableAppResumeWithActivity(SplashActivity::class.java)
+                AppOpenManager.getInstance().setTestAds(false)
+                AdsManager.preloadNative(this@SplashActivity,"native_preload")
+                AdsManager.showAdsSplash(this@SplashActivity,RemoteConfig.AD_CONFIG,binding.frBanner,R.layout.ad_native_fullscreen){
+                    Utils.getInstance().replaceActivity(this@SplashActivity, MainActivity::class.java)
+                }
             }
         })
     }

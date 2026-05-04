@@ -92,7 +92,7 @@ dependencies {
     implementation("com.facebook.shimmer:shimmer:0.5.0@aar")
 
     // Ads
-    implementation("com.google.android.libraries.ads.mobile.sdk:ads-mobile-sdk:1.0.0")
+    implementation("com.google.android.libraries.ads.mobile.sdk:ads-mobile-sdk:1.0.1")
     implementation("com.android.installreferrer:installreferrer:2.2")
     implementation("com.intuit.sdp:sdp-android:1.1.1")
 
