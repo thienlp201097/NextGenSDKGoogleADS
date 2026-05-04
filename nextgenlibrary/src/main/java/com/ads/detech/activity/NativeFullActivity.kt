@@ -44,6 +44,7 @@ class NativeFullActivity : AppCompatActivity() {
             v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom)
             insets
         }
+
         val statusHeight = getStatusBarHeight()
 
         binding.view3.layoutParams = binding.view3.layoutParams.apply {
