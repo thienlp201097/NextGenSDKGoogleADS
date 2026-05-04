@@ -36,7 +36,6 @@ android {
         viewBinding = true
     }
 
-    // Required for AGP 8+ so components["release"] produces a valid Maven publication (avoids odd server errors).
     publishing {
         singleVariant("release") {
             withSourcesJar()
@@ -44,44 +43,36 @@ android {
     }
 }
 
-// GitHub Packages 422: almost always "this version already exists" — bump version or delete the version on GitHub → Packages.
-publishing {
-    publications {
-        create<MavenPublication>("release") {
-            groupId = "com.ads"
-            artifactId = "nextGenLib"
-            version =
-                System.getenv("NEXTGENLIB_VERSION")
-                    ?: (project.findProperty("nextgenlib.version") as String?)
-                    ?: "1.0.0"
+afterEvaluate {
+    publishing {
+        publications {
+            create<MavenPublication>("release") {
+                groupId = "com.ads.detech"
+                artifactId = "detech-nextgen-lib"
+                version = "1.0.2"
 
-            afterEvaluate {
                 from(components["release"])
+
+                pom {
+                    name.set("NextGen Ads SDK")
+                    description.set("Ads SDK for Android")
+                    url.set("https://github.com/thienlp201097/NextGenSDKGoogleADS")
+                }
             }
         }
-    }
-    repositories {
-        maven {
-            name = "GitHubPackages"
-            url = uri("https://maven.pkg.github.com/thienlp201097/NextGenSDKGoogleADS")
-            credentials {
-                username =
-                    project.findProperty("gpr.user") as String?
-                        ?: System.getenv("GPR_USER")
-                        ?: System.getenv("GITHUB_ACTOR")
-                        ?: ""
-                password =
-                    project.findProperty("gpr.key") as String?
-                        ?: System.getenv("GPR_TOKEN")
-                        ?: System.getenv("TOKEN")
-                        ?: System.getenv("GITHUB_TOKEN")
-                        ?: ""
+
+        repositories {
+            maven {
+                name = "GitHubPackages"
+                url = uri("https://maven.pkg.github.com/thienlp201097/NextGenSDKGoogleADS")
+                credentials {
+                    username = project.findProperty("gpr.user")?.toString() ?: System.getenv("GPR_USER")
+                    password = project.findProperty("gpr.key")?.toString() ?: System.getenv("GPR_KEY")
+                }
             }
         }
     }
 }
-
-
 
 dependencies {
     implementation(libs.androidx.core.ktx)
@@ -101,7 +92,6 @@ dependencies {
     implementation("com.facebook.shimmer:shimmer:0.5.0@aar")
 
     // Ads
-//    implementation("com.google.android.gms:play-services-ads:25.2.0")
     implementation("com.google.android.libraries.ads.mobile.sdk:ads-mobile-sdk:1.0.0")
     implementation("com.android.installreferrer:installreferrer:2.2")
     implementation("com.intuit.sdp:sdp-android:1.1.1")
