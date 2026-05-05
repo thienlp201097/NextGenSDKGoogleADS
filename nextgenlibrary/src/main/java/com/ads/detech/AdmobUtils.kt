@@ -969,7 +969,6 @@ object AdmobUtils {
                                 override fun onAdClicked() {
                                     runOnMainThread {
                                         Log.d(TAG, "Native ad recorded a click.")
-                                        adCallback.onClickAds()
                                     }
                                 }
                             }
@@ -1104,7 +1103,6 @@ object AdmobUtils {
                                 override fun onAdClicked() {
                                     runOnMainThread {
                                         Log.d(TAG, "Native ad recorded a click.")
-                                        adCallback.onClickAds()
                                     }
                                 }
                             }

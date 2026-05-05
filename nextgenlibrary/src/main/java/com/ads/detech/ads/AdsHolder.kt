@@ -373,6 +373,7 @@ object AdsHolder {
                 }
 
                 override fun onClickAds() {
+
                 }
             })
     }
