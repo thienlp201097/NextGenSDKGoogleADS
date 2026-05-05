@@ -6,7 +6,7 @@ plugins {
 
 android {
     namespace = "com.ads.detech"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         minSdk = 26
@@ -49,7 +49,7 @@ afterEvaluate {
             create<MavenPublication>("release") {
                 groupId = "com.ads.detech"
                 artifactId = "detech-nextgen-lib"
-                version = "1.0.2"
+                version = "1.0.5-beta"
 
                 from(components["release"])
 

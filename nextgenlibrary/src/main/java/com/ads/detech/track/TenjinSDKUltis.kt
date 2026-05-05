@@ -7,14 +7,14 @@ import com.tenjin.android.TenjinSDK
 
 object TenjinSDKUtil {
     @SuppressLint("StaticFieldLeak")
-    lateinit var instance: TenjinSDK
+    var instance: TenjinSDK? = null
         private set
 
     fun init(context: Context, apiKey: String) {
-        if (!::instance.isInitialized) {
+        if (instance == null) {
             instance = TenjinSDK.getInstance(context.applicationContext, apiKey)
-            instance.setAppStore(TenjinSDK.AppStoreType.googleplay)
-            instance.connect()
+            instance?.setAppStore(TenjinSDK.AppStoreType.googleplay)
+            instance?.connect()
         }
     }
 

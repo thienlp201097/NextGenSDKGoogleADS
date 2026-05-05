@@ -101,3 +101,8 @@ dependencies {
     implementation("com.google.android.libraries.ads.mobile.sdk:ads-mobile-sdk:1.0.0")
     implementation("com.google.firebase:firebase-messaging-ktx:24.1.2")
 }
+
+configurations.configureEach {
+    exclude(group = "com.google.android.gms", module = "play-services-ads")
+    exclude(group = "com.google.android.gms", module = "play-services-ads-lite")
+}

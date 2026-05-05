@@ -91,20 +91,15 @@ object AdmobUtils {
     @JvmField
     var dialog: SweetAlertDialog? = null
     var dialogFullScreen: Dialog? = null
-
     // Biến check lần cuối hiển thị quảng cáo
     var lastTimeShowInterstitial: Long = 0
-    // Timeout init admob
-    var timeOut = 0
     //check ADS test
     var isTestDevice = false
     var isCheckTestDevice = false
     //Check quảng cáo đang show hay không
     @JvmField
     var isAdShowing = false
-
     private val mainHandler = Handler(Looper.getMainLooper())
-
     /** Next Gen GMA may invoke ad callbacks on background threads; UI and app callbacks must run on main. */
     private inline fun runOnMainThread(crossinline block: () -> Unit) {
         if (Looper.myLooper() == Looper.getMainLooper()) {
@@ -113,19 +108,14 @@ object AdmobUtils {
             mainHandler.post { block() }
         }
     }
-    var isClick = false
-
     //Ẩn hiện quảng cáo
     @JvmField
     var isShowAds = true
-
     //Dùng ID Test để hiển thị quảng cáo
     @JvmField
     var isTesting = false
-
     //List device test
     var testDevices: MutableList<String> = ArrayList()
-    var deviceId = ""
     // Waiting InterPreload
     private var waitAdHandler: Handler? = null
     private var waitAdRunnable: Runnable? = null
@@ -135,12 +125,6 @@ object AdmobUtils {
     var mRewardedInterstitialAd: RewardedInterstitialAd? = null
     var mInterstitialAd: InterstitialAd? = null
     var shimmerFrameLayout: ShimmerFrameLayout? = null
-
-    //id thật
-    var idIntersitialReal: String? = null
-    var interIsShowingWithNative = false
-    var interIsShowingWithBanner = false
-
     var referrerUrl: String = "abc"
 
 
@@ -160,7 +144,7 @@ object AdmobUtils {
             MobileAds.initialize(
                 context,
                 // Sample AdMob app ID: ca-app-pub-3940256099942544~3347511713
-                InitializationConfig.Builder(APP_ID).build(),
+                InitializationConfig.Builder(APP_ID).setNativeValidatorDisabled().build(),
             ) {
                 // Adapter initialization is complete.
             }
@@ -225,7 +209,7 @@ object AdmobUtils {
         val adSourceName: String = responseInfo?.loadedAdSourceResponseInfo?.name.toString()
         val adSourceId: String = responseInfo?.loadedAdSourceResponseInfo?.id.toString()
         //SE SDK processing logic
-        val seAdImpEventModel: SEAdImpEventModel = SEAdImpEventModel()
+        val seAdImpEventModel = SEAdImpEventModel()
         //Monetization Platform Name
         seAdImpEventModel.setAdNetworkPlatform(adSourceName)
         //Mediation Platform Name (e.g. admob SDK as "admob")
@@ -287,7 +271,7 @@ object AdmobUtils {
                     "ads"
                 }
             }
-            TenjinSDKUtil.instance.eventAdImpressionAdMob(adRevenueJson)
+            TenjinSDKUtil.instance?.eventAdImpressionAdMob(adRevenueJson)
             // banner / interstitial / rewarded / rewarded_interstitial / native / splash
             adRevenueJson.put("ad_format", adFormat2)
         } catch (e: JSONException) {
