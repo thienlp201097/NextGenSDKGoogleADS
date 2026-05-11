@@ -22,6 +22,7 @@ import com.google.android.libraries.ads.mobile.sdk.appopen.AppOpenAd
 import com.google.android.libraries.ads.mobile.sdk.appopen.AppOpenAdEventCallback
 import com.google.android.libraries.ads.mobile.sdk.common.AdLoadCallback
 import com.google.android.libraries.ads.mobile.sdk.common.FullScreenContentError
+import com.reyun.solar.engine.AdType
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -189,7 +190,7 @@ class AOAManager(private val activity: Activity,val appOpen: String,val timeOut:
                         override fun onAdPaid(value: AdValue) {
                             super.onAdPaid(value)
                             runOnMainThread {
-                                adImpressionSolarEngineSDK(value, appOpen, 6, appOpenAd?.getResponseInfo())
+                                adImpressionSolarEngineSDK(value,appOpen, AdType.Splash.value,appOpenAd?.getResponseInfo())
                                 appOpenAdsListener.onAdPaid(value, appOpen)
                             }
                         }

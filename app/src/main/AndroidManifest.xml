@@ -33,7 +33,6 @@
             android:name=".MainActivity"
             android:exported="true"/>
 
-
         <service
             android:name=".utils.MessageService"
             android:enabled="true"

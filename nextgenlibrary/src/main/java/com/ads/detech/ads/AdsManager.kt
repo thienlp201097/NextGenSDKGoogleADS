@@ -270,11 +270,11 @@ object AdsManager {
         }
 
         when (adsConfig.type) {
-            "1" -> AdsHolder.showInterstitialPreload(activity, adsConfig.units.inter,true, onAction)
+            "1" -> AdsHolder.showInterstitialPreload(activity, adsConfig.units.inter,false, onAction)
             "2" -> AdsHolder.showInterstitialPreloadWithNative(
                 activity,
                 adsConfig.units.inter,
-                adsConfig.units.native,true,
+                adsConfig.units.native,false,
                 layout_native,
                 onAction
             )

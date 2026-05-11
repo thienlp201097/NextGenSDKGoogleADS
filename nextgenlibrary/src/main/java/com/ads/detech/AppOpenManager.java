@@ -27,6 +27,7 @@ import com.google.android.libraries.ads.mobile.sdk.common.AdRequest;
 import com.google.android.libraries.ads.mobile.sdk.common.AdValue;
 import com.google.android.libraries.ads.mobile.sdk.common.FullScreenContentError;
 import com.google.android.libraries.ads.mobile.sdk.common.LoadAdError;
+import com.reyun.solar.engine.AdType;
 
 import java.util.ArrayList;
 import java.util.Date;
@@ -352,8 +353,7 @@ public class AppOpenManager implements Application.ActivityLifecycleCallbacks, L
                             new AppOpenAdEventCallback() {
                                 @Override
                                 public void onAdPaid(@NonNull AdValue adValue) {
-                                    AdmobUtils.adImpressionSolarEngineSDK(
-                                            adValue, appResumeAdId, 6, ad.getResponseInfo());
+                                    AdmobUtils.adImpressionSolarEngineSDK(adValue,appResumeAdId, AdType.Splash.value,appResumeAd.getResponseInfo());
                                     AdmobUtils.adImpressionFacebookSDK(currentActivity, adValue);
                                 }
 

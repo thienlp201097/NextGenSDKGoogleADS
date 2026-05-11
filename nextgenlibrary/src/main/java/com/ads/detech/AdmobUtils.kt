@@ -70,6 +70,7 @@ import com.google.android.libraries.ads.mobile.sdk.rewarded.RewardedAd
 import com.google.android.libraries.ads.mobile.sdk.rewarded.RewardedAdEventCallback
 import com.google.android.libraries.ads.mobile.sdk.rewardedinterstitial.RewardedInterstitialAd
 import com.google.android.libraries.ads.mobile.sdk.rewardedinterstitial.RewardedInterstitialAdEventCallback
+import com.reyun.solar.engine.AdType
 import com.reyun.solar.engine.SolarEngineManager
 import com.reyun.solar.engine.infos.SEAdImpEventModel
 import com.tiktok.TikTokBusinessSdk
@@ -108,6 +109,46 @@ object AdmobUtils {
             mainHandler.post { block() }
         }
     }
+
+    private val mobileAdsReadyLock = Any()
+    @Volatile
+    private var mobileAdsInitRequested = false
+    @Volatile
+    private var mobileAdsSdkReady = false
+    private val pendingAfterMobileAdsReady = mutableListOf<() -> Unit>()
+
+    private fun markMobileAdsInitializationComplete() {
+        val tasks: List<() -> Unit>
+        synchronized(mobileAdsReadyLock) {
+            if (mobileAdsSdkReady) {
+                return
+            }
+            mobileAdsSdkReady = true
+            tasks = pendingAfterMobileAdsReady.toList()
+            pendingAfterMobileAdsReady.clear()
+        }
+        tasks.forEach { mainHandler.post(it) }
+    }
+
+    /**
+     * Runs [block] after Mobile Ads initialization completes (or immediately if already complete).
+     * If [initAdmob] was never called, invokes [onMissingInit] and skips loading.
+     */
+    private fun runAfterMobileAdsInitialized(onMissingInit: () -> Unit, block: () -> Unit) {
+        if (!mobileAdsInitRequested) {
+            Log.e(TAG, "Chưa gọi AdmobUtils.initAdmob trước khi load ads")
+            onMissingInit()
+            return
+        }
+        synchronized(mobileAdsReadyLock) {
+            if (mobileAdsSdkReady) {
+                mainHandler.post(block)
+            } else {
+                pendingAfterMobileAdsReady.add(block)
+            }
+        }
+    }
+
     //Ẩn hiện quảng cáo
     @JvmField
     var isShowAds = true
@@ -140,36 +181,35 @@ object AdmobUtils {
         this.isCheckTestDevice = isCheckTestDevice
         isTesting = isDebug
         isShowAds = isEnableAds
-        CoroutineScope(Dispatchers.IO).launch {
-            MobileAds.initialize(
-                context,
-                // Sample AdMob app ID: ca-app-pub-3940256099942544~3347511713
-                InitializationConfig.Builder(APP_ID).setNativeValidatorDisabled().build(),
-            ) {
-                // Adapter initialization is complete.
-            }
-            withContext(Dispatchers.Main) {
-                val referrerClient = InstallReferrerClient.newBuilder(context).build()
+        val appContext = context.applicationContext
+        mobileAdsInitRequested = true
+        MobileAds.initialize(
+            appContext,
+            InitializationConfig.Builder(APP_ID).setNativeValidatorDisabled().build(),
+        ) {
+            markMobileAdsInitializationComplete()
+            runOnMainThread {
+                val referrerClient = InstallReferrerClient.newBuilder(appContext).build()
                 referrerClient.startConnection(object : InstallReferrerStateListener {
                     override fun onInstallReferrerSetupFinished(responseCode: Int) {
                         if (responseCode == InstallReferrerClient.InstallReferrerResponse.OK) {
-                            CoroutineScope(Dispatchers.IO).launch {
+                            CoroutineScope(Dispatchers.Main).launch {
                                 try {
-                                    val response = referrerClient.installReferrer
-                                    val resultUrl = response.installReferrer
+                                    val resultUrl = withContext(Dispatchers.IO) {
+                                        referrerClient.installReferrer.installReferrer
+                                    }
                                     referrerUrl = resultUrl
                                     Log.d("==Check Organic==", referrerUrl)
                                 } catch (_: Exception) {
                                     Log.d("==Check Organic==", "onInstallReferrerSetupFinished: Error")
                                 }
-                                withContext(Dispatchers.Main) {
-                                    mobileAdsListener.onSuccess()
-                                }
+                                mobileAdsListener.onSuccess()
                             }
                         } else {
                             mobileAdsListener.onSuccess()
                         }
                     }
+
                     override fun onInstallReferrerServiceDisconnected() {
                         Log.d("==Check Organic==", "onInstallReferrerServiceDisconnected:")
                         mobileAdsListener.onSuccess()
@@ -255,16 +295,16 @@ object AdmobUtils {
             adRevenueJson.put("value_micros", valueMicros)
             adRevenueJson.put("response_id", adSourceId)
             val adFormat2 = when(adFormat){
-                6->{
+                2->{
                     "splash"
                 }
-                0->{
+                5->{
                     "banner"
                 }
-                4->{
+                6,7->{
                     "native"
                 }
-                1->{
+                3->{
                     "inter"
                 }
                 else -> {
@@ -358,7 +398,7 @@ object AdmobUtils {
                             override fun onAdPaid(value: AdValue) {
                                 super.onAdPaid(value)
                                 runOnMainThread {
-                                    adImpressionSolarEngineSDK(value,bannerId,0,ad.getResponseInfo())
+                                    adImpressionSolarEngineSDK(value,bannerId,AdType.Banner.value,ad.getResponseInfo())
                                     adImpressionFacebookSDK(activity,value)
                                 }
                             }
@@ -462,7 +502,7 @@ object AdmobUtils {
                             override fun onAdPaid(value: AdValue) {
                                 super.onAdPaid(value)
                                 runOnMainThread {
-                                    adImpressionSolarEngineSDK(value,bannerId,0,ad.getResponseInfo())
+                                    adImpressionSolarEngineSDK(value,bannerId,AdType.Banner.value,ad.getResponseInfo())
                                     adImpressionFacebookSDK(activity,value)
                                 }
                             }
@@ -545,6 +585,7 @@ object AdmobUtils {
             .build()
         nativeHolder.isLoad = true
 
+        val nativeAdmobCallback = adCallback
 // Define the callback to handle successful ad loading or failed ad loading.
         val adCallback =
             object : NativeAdLoaderCallback {
@@ -566,14 +607,20 @@ object AdmobUtils {
 
                                     override fun onAdPaid(value: AdValue) {
                                         runOnMainThread {
-                                            adImpressionSolarEngineSDK(value, nativeHolder.ads,4,nativeHolder.nativeAd?.getResponseInfo())
-                                            adCallback.onPaid(value, nativeHolder.ads)
+                                            var native_type = AdType.Native.value
+                                            nativeHolder.nativeAd?.let { it1 ->
+                                                if (it1.mediaContent.hasVideoContent){
+                                                    native_type = AdType.NativeVideo.value
+                                                }
+                                            }
+                                            adImpressionSolarEngineSDK(value, nativeHolder.ads,native_type,nativeHolder.nativeAd?.getResponseInfo())
+                                            nativeAdmobCallback.onPaid(value, nativeHolder.ads)
                                             adImpressionFacebookSDK(context,value)
                                         }
                                     }
                                 }
                         }
-                        adCallback.onLoadedAndGetNativeAd(nativeAd)
+                        nativeAdmobCallback.onLoadedAndGetNativeAd(nativeAd)
                     }
                 }
 
@@ -585,12 +632,24 @@ object AdmobUtils {
                         nativeHolder.nativeAd = null
                         nativeHolder.isLoad = false
                         nativeHolder.native_mutable.value = null
-                        adCallback.onAdFail(adError.message)
+                        nativeAdmobCallback.onAdFail(adError.message)
                     }
                 }
             }
         // Load the native ad with our request and callback.
-        NativeAdLoader.load(adRequest, adCallback)
+        runAfterMobileAdsInitialized(
+            onMissingInit = {
+                runOnMainThread {
+                    nativeHolder.nativeAd = null
+                    nativeHolder.isLoad = false
+                    nativeHolder.native_mutable.value = null
+                    nativeAdmobCallback.onAdFail("Mobile Ads not initialized")
+                }
+            },
+            block = {
+                NativeAdLoader.load(adRequest, adCallback)
+            },
+        )
     }
 
     //Load native 2 in here
@@ -639,7 +698,13 @@ object AdmobUtils {
                             override fun onAdPaid(value: AdValue) {
                                 runOnMainThread {
                                     Log.d(TAG, "Native ad onPaidEvent: ${value.valueMicros} ${value.currencyCode}")
-                                    adImpressionSolarEngineSDK(value, nativeHolder.ads,4,nativeHolder.nativeAd?.getResponseInfo())
+                                    var native_type = AdType.Native.value
+                                    nativeHolder.nativeAd?.let { it1 ->
+                                        if (it1.mediaContent.hasVideoContent){
+                                            native_type = AdType.NativeVideo.value
+                                        }
+                                    }
+                                    adImpressionSolarEngineSDK(value, nativeHolder.ads,native_type,nativeHolder.nativeAd?.getResponseInfo())
                                     adImpressionFacebookSDK(activity,value)
                                     callback.onPaid(value, nativeHolder.ads)
                                 }
@@ -701,7 +766,13 @@ object AdmobUtils {
                                 override fun onAdPaid(value: AdValue) {
                                     runOnMainThread {
                                         Log.d(TAG, "Native ad onPaidEvent: ${value.valueMicros} ${value.currencyCode}")
-                                        adImpressionSolarEngineSDK(value, nativeHolder.ads,4,nativeHolder.nativeAd?.getResponseInfo())
+                                        var native_type = AdType.Native.value
+                                        nativeHolder.nativeAd?.let { it1 ->
+                                            if (it1.mediaContent.hasVideoContent){
+                                                native_type = AdType.NativeVideo.value
+                                            }
+                                        }
+                                        adImpressionSolarEngineSDK(value, nativeHolder.ads,native_type,nativeHolder.nativeAd?.getResponseInfo())
                                         adImpressionFacebookSDK(activity,value)
                                         callback.onPaid(value, nativeHolder.ads)
                                     }
@@ -772,7 +843,13 @@ object AdmobUtils {
                             override fun onAdPaid(value: AdValue) {
                                 runOnMainThread {
                                     Log.d(TAG, "Native ad onPaidEvent: ${value.valueMicros} ${value.currencyCode}")
-                                    adImpressionSolarEngineSDK(value, nativeHolder.ads,4,nativeHolder.nativeAd?.getResponseInfo())
+                                    var native_type = AdType.Native.value
+                                    nativeHolder.nativeAd?.let { it1 ->
+                                        if (it1.mediaContent.hasVideoContent){
+                                            native_type = AdType.NativeVideo.value
+                                        }
+                                    }
+                                    adImpressionSolarEngineSDK(value, nativeHolder.ads,native_type,nativeHolder.nativeAd?.getResponseInfo())
                                     adImpressionFacebookSDK(activity,value)
                                 }
                             }
@@ -832,7 +909,13 @@ object AdmobUtils {
                                 override fun onAdPaid(value: AdValue) {
                                     runOnMainThread {
                                         Log.d(TAG, "Native ad onPaidEvent: ${value.valueMicros} ${value.currencyCode}")
-                                        adImpressionSolarEngineSDK(value, nativeHolder.ads,4,nativeHolder.nativeAd?.getResponseInfo())
+                                        var native_type = AdType.Native.value
+                                        nativeHolder.nativeAd?.let { it1 ->
+                                            if (it1.mediaContent.hasVideoContent){
+                                                native_type = AdType.NativeVideo.value
+                                            }
+                                        }
+                                        adImpressionSolarEngineSDK(value, nativeHolder.ads,native_type,nativeHolder.nativeAd?.getResponseInfo())
                                         adImpressionFacebookSDK(activity,value)
                                     }
                                 }
@@ -924,6 +1007,7 @@ object AdmobUtils {
                 .setVideoOptions(videoOptions)
                 .build()
 
+        val nativeAdCallbackNew = adCallback
         // Define the callback to handle successful ad loading or failed ad loading.
         val adCallback =
             object : NativeAdLoaderCallback {
@@ -931,7 +1015,7 @@ object AdmobUtils {
                     Log.d(TAG, "Native ad loaded.")
                     CoroutineScope(Dispatchers.Main).launch {
                         // Remove all old ad views when loading a new native ad.
-                        adCallback.onNativeAdLoaded()
+                        nativeAdCallbackNew.onNativeAdLoaded()
                         checkAdsTest(nativeAd)
                         val adView = activity.layoutInflater
                             .inflate(layout, null) as NativeAdView
@@ -982,7 +1066,13 @@ object AdmobUtils {
                                     override fun onAdPaid(value: AdValue) {
                                         runOnMainThread {
                                             Log.d(TAG, "Native ad onPaidEvent: ${value.valueMicros} ${value.currencyCode}")
-                                            adImpressionSolarEngineSDK(value, nativeHolder.ads,4,nativeHolder.nativeAd?.getResponseInfo())
+                                            var native_type = AdType.Native.value
+                                            nativeHolder.nativeAd?.let { it1 ->
+                                                if (it1.mediaContent.hasVideoContent){
+                                                    native_type = AdType.NativeVideo.value
+                                                }
+                                            }
+                                            adImpressionSolarEngineSDK(value, nativeHolder.ads,native_type,nativeHolder.nativeAd?.getResponseInfo())
                                             adImpressionFacebookSDK(activity,value)
                                         }
                                     }
@@ -1001,13 +1091,28 @@ object AdmobUtils {
 
                         }
                         nativeHolder.isLoad = false
-                        adCallback.onAdFail(adError.message)
+                        nativeAdCallbackNew.onAdFail(adError.message)
                     }
                 }
 
             }
         // Load the native ad with our request and callback.
-        NativeAdLoader.load(adRequest, adCallback)
+        runAfterMobileAdsInitialized(
+            onMissingInit = {
+                runOnMainThread {
+                    shimmerFrameLayout.stopShimmer()
+                    try {
+                        viewGroup.removeAllViews()
+                    } catch (_: Exception) {
+                    }
+                    nativeHolder.isLoad = false
+                    nativeAdCallbackNew.onAdFail("Mobile Ads not initialized")
+                }
+            },
+            block = {
+                NativeAdLoader.load(adRequest, adCallback)
+            },
+        )
     }
 
     @JvmStatic
@@ -1058,6 +1163,7 @@ object AdmobUtils {
                 .setVideoOptions(videoOptions)
                 .build()
 
+        val nativeAdCallbackCollapsible = adCallback
         // Define the callback to handle successful ad loading or failed ad loading.
         val adCallback =
             object : NativeAdLoaderCallback {
@@ -1065,11 +1171,11 @@ object AdmobUtils {
                     Log.d(TAG, "Native ad loaded.")
                     CoroutineScope(Dispatchers.Main).launch {
                         // Remove all old ad views when loading a new native ad.
-                        adCallback.onNativeAdLoaded()
+                        nativeAdCallbackCollapsible.onNativeAdLoaded()
                         checkAdsTest(nativeAd)
                         val adView = activity.layoutInflater
                             .inflate(layout, null) as NativeAdView
-                        populateNativeAdViewClose(nativeAd, adView, size,adCallback)
+                        populateNativeAdViewClose(nativeAd, adView, size,nativeAdCallbackCollapsible)
                         shimmerFrameLayout.stopShimmer()
                         try {
                             viewGroup.removeAllViews()
@@ -1116,7 +1222,13 @@ object AdmobUtils {
                                     override fun onAdPaid(value: AdValue) {
                                         runOnMainThread {
                                             Log.d(TAG, "Native ad onPaidEvent: ${value.valueMicros} ${value.currencyCode}")
-                                            adImpressionSolarEngineSDK(value, nativeHolder.ads,4,nativeHolder.nativeAd?.getResponseInfo())
+                                            var native_type = AdType.Native.value
+                                            nativeHolder.nativeAd?.let { it1 ->
+                                                if (it1.mediaContent.hasVideoContent){
+                                                    native_type = AdType.NativeVideo.value
+                                                }
+                                            }
+                                            adImpressionSolarEngineSDK(value, nativeHolder.ads,native_type,nativeHolder.nativeAd?.getResponseInfo())
                                             adImpressionFacebookSDK(activity,value)
                                         }
                                     }
@@ -1135,13 +1247,28 @@ object AdmobUtils {
 
                         }
                         nativeHolder.isLoad = false
-                        adCallback.onAdFail(adError.message)
+                        nativeAdCallbackCollapsible.onAdFail(adError.message)
                     }
                 }
 
             }
         // Load the native ad with our request and callback.
-        NativeAdLoader.load(adRequest, adCallback)
+        runAfterMobileAdsInitialized(
+            onMissingInit = {
+                runOnMainThread {
+                    shimmerFrameLayout.stopShimmer()
+                    try {
+                        viewGroup.removeAllViews()
+                    } catch (_: Exception) {
+                    }
+                    nativeHolder.isLoad = false
+                    nativeAdCallbackCollapsible.onAdFail("Mobile Ads not initialized")
+                }
+            },
+            block = {
+                NativeAdLoader.load(adRequest, adCallback)
+            },
+        )
     }
 
     /**
@@ -1244,7 +1371,7 @@ object AdmobUtils {
                                     override fun onAdPaid(value: AdValue) {
                                         super.onAdPaid(value)
                                         runOnMainThread {
-                                            adImpressionSolarEngineSDK(value, admobId,1,mInterstitialAd?.getResponseInfo())
+                                            adImpressionSolarEngineSDK(value, admobId,AdType.Interstitial.value,mInterstitialAd?.getResponseInfo())
                                             adImpressionFacebookSDK(activity, value)
                                         }
                                     }
@@ -1334,78 +1461,141 @@ object AdmobUtils {
             AD_UNIT_ID = activity.getString(R.string.test_ads_admob_inter_id)
         }
 
-        if (enableLoadingDialog) {
-            dialogLoading(activity)
-        }
         Log.d(TAG, "ID InterstitialAdPreload: $AD_UNIT_ID")
 
-
-        if (InterstitialAdPreloader.isAdAvailable(AD_UNIT_ID)) {
-            val ad = InterstitialAdPreloader.pollAd(AD_UNIT_ID)
-            Log.d(TAG, "ID InterstitialAdPreload: isAdAvailable")
-            Handler(Looper.getMainLooper()).postDelayed({
-                ad?.apply {
-                    Log.d(TAG, "Interstitial ad response info: ${this.getResponseInfo()}")
-                    this.adEventCallback =
-                        object : InterstitialAdEventCallback {
-                            override fun onAdShowedFullScreenContent() {
-                                super.onAdShowedFullScreenContent()
-                                runOnMainThread {
-                                    adCallback.onAdShowed()
-                                    Handler(Looper.getMainLooper()).postDelayed({
-                                        dismissAdDialog()
-                                    }, 300)
-                                }
-                            }
-
-                            override fun onAdClicked() {
-                                super.onAdClicked()
-                                runOnMainThread {
-                                    adCallback.onClickAds()
-                                }
-                            }
-
-                            override fun onAdDismissedFullScreenContent() {
-                                super.onAdDismissedFullScreenContent()
-                                runOnMainThread {
-                                    lastTimeShowInterstitial = Date().time
-                                    adCallback.onEventClickAdClosed()
-                                    cleanupAfterAd(appOpenManager)
-                                }
-                            }
-
-                            override fun onAdFailedToShowFullScreenContent(fullScreenContentError: FullScreenContentError) {
-                                super.onAdFailedToShowFullScreenContent(fullScreenContentError)
-                                runOnMainThread {
-                                    handleAdFailure(fullScreenContentError.message, adCallback, appOpenManager)
-                                }
-                            }
-                            override fun onAdImpression() {
-                                Log.d(TAG, "Interstitial ad recorded an impression.")
-                            }
-
-                            override fun onAdPaid(value: AdValue) {
-                                runOnMainThread {
-                                    Log.d(
-                                        TAG,
-                                        "Interstitial ad onPaidEvent: ${value.valueMicros} ${value.currencyCode}",
-                                    )
-                                    adImpressionSolarEngineSDK(value, AD_UNIT_ID,1,ad.getResponseInfo())
-                                    adImpressionFacebookSDK(activity, value)
-                                }
-                            }
-                        }
-
-                    // Show the ad.
-                    adCallback.onStartAction()
-                    show(activity)
-                    isAdShowing = true
-                }
-            }, 300)
-        }else{
-            Log.d(TAG, "ID InterstitialAdPreload: waitUntilAdAvailable")
-            waitUntilAdAvailable(AD_UNIT_ID, onAvailable = {
+        if (enableLoadingDialog) {
+            dialogLoading(activity)
+            if (InterstitialAdPreloader.isAdAvailable(AD_UNIT_ID)) {
                 val ad = InterstitialAdPreloader.pollAd(AD_UNIT_ID)
+                Log.d(TAG, "ID InterstitialAdPreload: isAdAvailable")
+                Handler(Looper.getMainLooper()).postDelayed({
+                    ad?.apply {
+                        Log.d(TAG, "Interstitial ad response info: ${this.getResponseInfo()}")
+                        this.adEventCallback =
+                            object : InterstitialAdEventCallback {
+                                override fun onAdShowedFullScreenContent() {
+                                    super.onAdShowedFullScreenContent()
+                                    runOnMainThread {
+                                        adCallback.onAdShowed()
+                                        Handler(Looper.getMainLooper()).postDelayed({
+                                            dismissAdDialog()
+                                        }, 300)
+                                    }
+                                }
+
+                                override fun onAdClicked() {
+                                    super.onAdClicked()
+                                    runOnMainThread {
+                                        adCallback.onClickAds()
+                                    }
+                                }
+
+                                override fun onAdDismissedFullScreenContent() {
+                                    super.onAdDismissedFullScreenContent()
+                                    runOnMainThread {
+                                        lastTimeShowInterstitial = Date().time
+                                        adCallback.onEventClickAdClosed()
+                                        cleanupAfterAd(appOpenManager)
+                                    }
+                                }
+
+                                override fun onAdFailedToShowFullScreenContent(fullScreenContentError: FullScreenContentError) {
+                                    super.onAdFailedToShowFullScreenContent(fullScreenContentError)
+                                    runOnMainThread {
+                                        handleAdFailure(fullScreenContentError.message, adCallback, appOpenManager)
+                                    }
+                                }
+                                override fun onAdImpression() {
+                                    Log.d(TAG, "Interstitial ad recorded an impression.")
+                                }
+
+                                override fun onAdPaid(value: AdValue) {
+                                    runOnMainThread {
+                                        Log.d(
+                                            TAG,
+                                            "Interstitial ad onPaidEvent: ${value.valueMicros} ${value.currencyCode}",
+                                        )
+                                        adImpressionSolarEngineSDK(value, AD_UNIT_ID,AdType.Interstitial.value,ad.getResponseInfo())
+                                        adImpressionFacebookSDK(activity, value)
+                                    }
+                                }
+                            }
+
+                        // Show the ad.
+                        adCallback.onStartAction()
+                        show(activity)
+                        isAdShowing = true
+                    }
+                }, 300)
+            }else{
+                Log.d(TAG, "ID InterstitialAdPreload: waitUntilAdAvailable")
+                waitUntilAdAvailable(AD_UNIT_ID, onAvailable = {
+                    val ad = InterstitialAdPreloader.pollAd(AD_UNIT_ID)
+                    ad?.apply {
+                        Log.d(TAG, "Interstitial ad response info: ${this.getResponseInfo()}")
+                        this.adEventCallback =
+                            object : InterstitialAdEventCallback {
+                                override fun onAdShowedFullScreenContent() {
+                                    super.onAdShowedFullScreenContent()
+                                    runOnMainThread {
+                                        adCallback.onAdShowed()
+                                        Handler(Looper.getMainLooper()).postDelayed({
+                                            dismissAdDialog()
+                                        }, 300)
+                                    }
+                                }
+
+                                override fun onAdClicked() {
+                                    super.onAdClicked()
+                                    runOnMainThread {
+                                        adCallback.onClickAds()
+                                    }
+                                }
+
+                                override fun onAdDismissedFullScreenContent() {
+                                    super.onAdDismissedFullScreenContent()
+                                    runOnMainThread {
+                                        lastTimeShowInterstitial = Date().time
+                                        adCallback.onEventClickAdClosed()
+                                        cleanupAfterAd(appOpenManager)
+                                    }
+                                }
+
+                                override fun onAdFailedToShowFullScreenContent(fullScreenContentError: FullScreenContentError) {
+                                    super.onAdFailedToShowFullScreenContent(fullScreenContentError)
+                                    runOnMainThread {
+                                        handleAdFailure(fullScreenContentError.message, adCallback, appOpenManager)
+                                    }
+                                }
+                                override fun onAdImpression() {
+                                    Log.d(TAG, "Interstitial ad recorded an impression.")
+                                }
+
+                                override fun onAdPaid(value: AdValue) {
+                                    runOnMainThread {
+                                        Log.d(
+                                            TAG,
+                                            "Interstitial ad onPaidEvent: ${value.valueMicros} ${value.currencyCode}",
+                                        )
+                                        adImpressionSolarEngineSDK(value, AD_UNIT_ID,AdType.Interstitial.value,ad.getResponseInfo())
+                                        adImpressionFacebookSDK(activity, value)
+                                    }
+                                }
+                            }
+
+                        // Show the ad.
+                        adCallback.onStartAction()
+                        show(activity)
+                        isAdShowing = true
+                    }
+                }, onTimeout = {
+                    handleAdFailure("mInterstitialAd null", adCallback, appOpenManager)
+                })
+            }
+        }else{
+            if (InterstitialAdPreloader.isAdAvailable(AD_UNIT_ID)) {
+                val ad = InterstitialAdPreloader.pollAd(AD_UNIT_ID)
+                Log.d(TAG, "ID InterstitialAdPreload: isAdAvailable")
                 ad?.apply {
                     Log.d(TAG, "Interstitial ad response info: ${this.getResponseInfo()}")
                     this.adEventCallback =
@@ -1452,7 +1642,7 @@ object AdmobUtils {
                                         TAG,
                                         "Interstitial ad onPaidEvent: ${value.valueMicros} ${value.currencyCode}",
                                     )
-                                    adImpressionSolarEngineSDK(value, AD_UNIT_ID,1,ad.getResponseInfo())
+                                    adImpressionSolarEngineSDK(value, AD_UNIT_ID,AdType.Interstitial.value,ad.getResponseInfo())
                                     adImpressionFacebookSDK(activity, value)
                                 }
                             }
@@ -1463,10 +1653,74 @@ object AdmobUtils {
                     show(activity)
                     isAdShowing = true
                 }
-            }, onTimeout = {
-                handleAdFailure("mInterstitialAd null", adCallback, appOpenManager)
-            })
+            }else{
+                dialogLoading(activity)
+                Log.d(TAG, "ID InterstitialAdPreload: waitUntilAdAvailable")
+                waitUntilAdAvailable(AD_UNIT_ID, onAvailable = {
+                    val ad = InterstitialAdPreloader.pollAd(AD_UNIT_ID)
+                    ad?.apply {
+                        Log.d(TAG, "Interstitial ad response info: ${this.getResponseInfo()}")
+                        this.adEventCallback =
+                            object : InterstitialAdEventCallback {
+                                override fun onAdShowedFullScreenContent() {
+                                    super.onAdShowedFullScreenContent()
+                                    runOnMainThread {
+                                        adCallback.onAdShowed()
+                                        Handler(Looper.getMainLooper()).postDelayed({
+                                            dismissAdDialog()
+                                        }, 300)
+                                    }
+                                }
+
+                                override fun onAdClicked() {
+                                    super.onAdClicked()
+                                    runOnMainThread {
+                                        adCallback.onClickAds()
+                                    }
+                                }
+
+                                override fun onAdDismissedFullScreenContent() {
+                                    super.onAdDismissedFullScreenContent()
+                                    runOnMainThread {
+                                        lastTimeShowInterstitial = Date().time
+                                        adCallback.onEventClickAdClosed()
+                                        cleanupAfterAd(appOpenManager)
+                                    }
+                                }
+
+                                override fun onAdFailedToShowFullScreenContent(fullScreenContentError: FullScreenContentError) {
+                                    super.onAdFailedToShowFullScreenContent(fullScreenContentError)
+                                    runOnMainThread {
+                                        handleAdFailure(fullScreenContentError.message, adCallback, appOpenManager)
+                                    }
+                                }
+                                override fun onAdImpression() {
+                                    Log.d(TAG, "Interstitial ad recorded an impression.")
+                                }
+
+                                override fun onAdPaid(value: AdValue) {
+                                    runOnMainThread {
+                                        Log.d(
+                                            TAG,
+                                            "Interstitial ad onPaidEvent: ${value.valueMicros} ${value.currencyCode}",
+                                        )
+                                        adImpressionSolarEngineSDK(value, AD_UNIT_ID,AdType.Interstitial.value,ad.getResponseInfo())
+                                        adImpressionFacebookSDK(activity, value)
+                                    }
+                                }
+                            }
+
+                        // Show the ad.
+                        adCallback.onStartAction()
+                        show(activity)
+                        isAdShowing = true
+                    }
+                }, onTimeout = {
+                    handleAdFailure("mInterstitialAd null", adCallback, appOpenManager)
+                })
+            }
         }
+
     }
     private fun waitUntilAdAvailable(
         adUnitId: String,
@@ -1641,7 +1895,7 @@ object AdmobUtils {
                                 override fun onAdPaid(value: AdValue) {
                                     super.onAdPaid(value)
                                     runOnMainThread {
-                                        adImpressionSolarEngineSDK(value, admobId!!,1,ad.getResponseInfo())
+                                        adImpressionSolarEngineSDK(value, admobId!!,AdType.RewardVideo.value,ad.getResponseInfo())
                                         adImpressionFacebookSDK(activity, value)
                                     }
                                 }
@@ -1785,7 +2039,7 @@ object AdmobUtils {
                                 override fun onAdPaid(value: AdValue) {
                                     super.onAdPaid(value)
                                     runOnMainThread {
-                                        adImpressionSolarEngineSDK(value, admobId!!,1,ad.getResponseInfo())
+                                        adImpressionSolarEngineSDK(value, admobId!!,AdType.RewardVideo.value,ad.getResponseInfo())
                                         adImpressionFacebookSDK(activity, value)
                                     }
                                 }
@@ -1903,6 +2157,7 @@ object AdmobUtils {
             .build()
         nativeHolder.isLoad = true
 
+        val nativeFullscreenCallback = adCallback
 // Define the callback to handle successful ad loading or failed ad loading.
         val adCallback =
             object : NativeAdLoaderCallback {
@@ -1924,13 +2179,19 @@ object AdmobUtils {
 
                                     override fun onAdPaid(value: AdValue) {
                                         runOnMainThread {
-                                            adImpressionSolarEngineSDK(value, nativeHolder.ads,4,nativeHolder.nativeAd?.getResponseInfo())
+                                            var native_type = AdType.Native.value
+                                            nativeHolder.nativeAd?.let { it1 ->
+                                                if (it1.mediaContent.hasVideoContent){
+                                                    native_type = AdType.NativeVideo.value
+                                                }
+                                            }
+                                            adImpressionSolarEngineSDK(value, nativeHolder.ads,native_type,nativeHolder.nativeAd?.getResponseInfo())
                                             adImpressionFacebookSDK(context,value)
                                         }
                                     }
                                 }
                         }
-                        adCallback.onLoadedAndGetNativeAd(nativeAd)
+                        nativeFullscreenCallback.onLoadedAndGetNativeAd(nativeAd)
                     }
                 }
 
@@ -1942,12 +2203,24 @@ object AdmobUtils {
                         nativeHolder.nativeAd = null
                         nativeHolder.isLoad = false
                         nativeHolder.native_mutable.value = null
-                        adCallback.onAdFail(adError.message)
+                        nativeFullscreenCallback.onAdFail(adError.message)
                     }
                 }
             }
         // Load the native ad with our request and callback.
-        NativeAdLoader.load(adRequest, adCallback)
+        runAfterMobileAdsInitialized(
+            onMissingInit = {
+                runOnMainThread {
+                    nativeHolder.nativeAd = null
+                    nativeHolder.isLoad = false
+                    nativeHolder.native_mutable.value = null
+                    nativeFullscreenCallback.onAdFail("Mobile Ads not initialized")
+                }
+            },
+            block = {
+                NativeAdLoader.load(adRequest, adCallback)
+            },
+        )
     }
 
     @JvmStatic
@@ -1979,6 +2252,7 @@ object AdmobUtils {
             .build()
         nativeHolder.isLoad = true
 
+        val nativeFullscreenInterCallback = adCallback
 // Define the callback to handle successful ad loading or failed ad loading.
         val adCallback =
             object : NativeAdLoaderCallback {
@@ -2000,7 +2274,13 @@ object AdmobUtils {
 
                                     override fun onAdPaid(value: AdValue) {
                                         runOnMainThread {
-                                            adImpressionSolarEngineSDK(value, nativeHolder.ads,4,nativeHolder.nativeAd?.getResponseInfo())
+                                            var native_type = AdType.Native.value
+                                            nativeHolder.nativeAd?.let { it1 ->
+                                                if (it1.mediaContent.hasVideoContent){
+                                                    native_type = AdType.NativeVideo.value
+                                                }
+                                            }
+                                            adImpressionSolarEngineSDK(value, nativeHolder.ads,native_type,nativeHolder.nativeAd?.getResponseInfo())
                                             adImpressionFacebookSDK(context,value)
                                         }
                                     }
@@ -2008,12 +2288,12 @@ object AdmobUtils {
                                     override fun onAdClicked() {
                                         runOnMainThread {
                                             super.onAdClicked()
-                                            adCallback.onClickAds()
+                                            nativeFullscreenInterCallback.onClickAds()
                                         }
                                     }
                                 }
                         }
-                        adCallback.onLoadedAndGetNativeAd(nativeAd)
+                        nativeFullscreenInterCallback.onLoadedAndGetNativeAd(nativeAd)
                     }
                 }
 
@@ -2025,13 +2305,25 @@ object AdmobUtils {
                         nativeHolder.nativeAd = null
                         nativeHolder.isLoad = false
                         nativeHolder.native_mutable.value = null
-                        adCallback.onAdFail(adError.message)
+                        nativeFullscreenInterCallback.onAdFail(adError.message)
                     }
                 }
 
             }
         // Load the native ad with our request and callback.
-        NativeAdLoader.load(adRequest, adCallback)
+        runAfterMobileAdsInitialized(
+            onMissingInit = {
+                runOnMainThread {
+                    nativeHolder.nativeAd = null
+                    nativeHolder.isLoad = false
+                    nativeHolder.native_mutable.value = null
+                    nativeFullscreenInterCallback.onAdFail("Mobile Ads not initialized")
+                }
+            },
+            block = {
+                NativeAdLoader.load(adRequest, adCallback)
+            },
+        )
 
 
 
@@ -2077,7 +2369,13 @@ object AdmobUtils {
                             override fun onAdPaid(value: AdValue) {
                                 runOnMainThread {
                                     Log.d(TAG, "Native ad onPaidEvent: ${value.valueMicros} ${value.currencyCode}")
-                                    adImpressionSolarEngineSDK(value, nativeHolder.ads,4,nativeHolder.nativeAd?.getResponseInfo())
+                                    var native_type = AdType.Native.value
+                                    nativeHolder.nativeAd?.let { it1 ->
+                                        if (it1.mediaContent.hasVideoContent){
+                                            native_type = AdType.NativeVideo.value
+                                        }
+                                    }
+                                    adImpressionSolarEngineSDK(value, nativeHolder.ads,native_type,nativeHolder.nativeAd?.getResponseInfo())
                                     adImpressionFacebookSDK(activity,value)
                                     callback.onPaid(value, nativeHolder.ads)
                                 }
@@ -2137,7 +2435,13 @@ object AdmobUtils {
                                 override fun onAdPaid(value: AdValue) {
                                     runOnMainThread {
                                         Log.d(TAG, "Native ad onPaidEvent: ${value.valueMicros} ${value.currencyCode}")
-                                        adImpressionSolarEngineSDK(value, nativeHolder.ads,4,nativeHolder.nativeAd?.getResponseInfo())
+                                        var native_type = AdType.Native.value
+                                        nativeHolder.nativeAd?.let { it1 ->
+                                            if (it1.mediaContent.hasVideoContent){
+                                                native_type = AdType.NativeVideo.value
+                                            }
+                                        }
+                                        adImpressionSolarEngineSDK(value, nativeHolder.ads,native_type,nativeHolder.nativeAd?.getResponseInfo())
                                         adImpressionFacebookSDK(activity,value)
                                         callback.onPaid(value, nativeHolder.ads)
                                     }
