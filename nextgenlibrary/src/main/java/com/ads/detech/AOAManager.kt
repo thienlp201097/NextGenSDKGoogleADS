@@ -93,7 +93,7 @@ class AOAManager(private val activity: Activity,val appOpen: String,val timeOut:
                             appOpenAdsListener.onAdsLoaded()
                             job.cancel()
                             Log.d("====Timeout", "isAdAvailable = true")
-                            if (!AppOpenManager.getInstance().isShowingAd && !isShowingAd && isLoadAndShow) {
+                            if (!AppOpenManager.isShowingAd && !isShowingAd && isLoadAndShow) {
                                 showAdIfAvailable()
                             }
                             // [END_EXCLUDE]
@@ -210,7 +210,7 @@ class AOAManager(private val activity: Activity,val appOpen: String,val timeOut:
                 } catch (ignored: Exception) {
                 }
                 Handler(Looper.getMainLooper()).postDelayed({
-                    if (!AppOpenManager.getInstance().isShowingAd && !isShowingAd){
+                    if (!AppOpenManager.isShowingAd && !isShowingAd){
                         Log.d("===AOA","Show")
                         try {
                             val txt = dialogFullScreen?.findViewById<TextView>(R.id.txtLoading)

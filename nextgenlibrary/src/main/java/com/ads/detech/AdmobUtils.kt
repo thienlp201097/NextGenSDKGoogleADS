@@ -608,12 +608,12 @@ object AdmobUtils {
                                     override fun onAdPaid(value: AdValue) {
                                         runOnMainThread {
                                             var native_type = AdType.Native.value
-                                            nativeHolder.nativeAd?.let { it1 ->
+                                            nativeAd.let { it1 ->
                                                 if (it1.mediaContent.hasVideoContent){
                                                     native_type = AdType.NativeVideo.value
                                                 }
                                             }
-                                            adImpressionSolarEngineSDK(value, nativeHolder.ads,native_type,nativeHolder.nativeAd?.getResponseInfo())
+                                            adImpressionSolarEngineSDK(value, nativeHolder.ads,native_type,nativeAd.getResponseInfo())
                                             nativeAdmobCallback.onPaid(value, nativeHolder.ads)
                                             adImpressionFacebookSDK(context,value)
                                         }
@@ -1212,7 +1212,7 @@ object AdmobUtils {
                                     }
                                 }
                             }
-                        nativeHolder.nativeAd?.apply {
+                        nativeAd.apply {
                             this.adEventCallback =
                                 object : NativeAdEventCallback {
                                     override fun onAdImpression() {
@@ -1223,12 +1223,12 @@ object AdmobUtils {
                                         runOnMainThread {
                                             Log.d(TAG, "Native ad onPaidEvent: ${value.valueMicros} ${value.currencyCode}")
                                             var native_type = AdType.Native.value
-                                            nativeHolder.nativeAd?.let { it1 ->
+                                            nativeAd.let { it1 ->
                                                 if (it1.mediaContent.hasVideoContent){
                                                     native_type = AdType.NativeVideo.value
                                                 }
                                             }
-                                            adImpressionSolarEngineSDK(value, nativeHolder.ads,native_type,nativeHolder.nativeAd?.getResponseInfo())
+                                            adImpressionSolarEngineSDK(value, nativeHolder.ads,native_type,nativeAd.getResponseInfo())
                                             adImpressionFacebookSDK(activity,value)
                                         }
                                     }
@@ -2180,12 +2180,12 @@ object AdmobUtils {
                                     override fun onAdPaid(value: AdValue) {
                                         runOnMainThread {
                                             var native_type = AdType.Native.value
-                                            nativeHolder.nativeAd?.let { it1 ->
+                                            nativeAd.let { it1 ->
                                                 if (it1.mediaContent.hasVideoContent){
                                                     native_type = AdType.NativeVideo.value
                                                 }
                                             }
-                                            adImpressionSolarEngineSDK(value, nativeHolder.ads,native_type,nativeHolder.nativeAd?.getResponseInfo())
+                                            adImpressionSolarEngineSDK(value, nativeHolder.ads,native_type,nativeAd.getResponseInfo())
                                             adImpressionFacebookSDK(context,value)
                                         }
                                     }
@@ -2275,12 +2275,12 @@ object AdmobUtils {
                                     override fun onAdPaid(value: AdValue) {
                                         runOnMainThread {
                                             var native_type = AdType.Native.value
-                                            nativeHolder.nativeAd?.let { it1 ->
+                                            nativeAd.let { it1 ->
                                                 if (it1.mediaContent.hasVideoContent){
                                                     native_type = AdType.NativeVideo.value
                                                 }
                                             }
-                                            adImpressionSolarEngineSDK(value, nativeHolder.ads,native_type,nativeHolder.nativeAd?.getResponseInfo())
+                                            adImpressionSolarEngineSDK(value, nativeHolder.ads,native_type,nativeAd.getResponseInfo())
                                             adImpressionFacebookSDK(context,value)
                                         }
                                     }
