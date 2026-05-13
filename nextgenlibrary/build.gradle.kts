@@ -48,8 +48,8 @@ afterEvaluate {
         publications {
             create<MavenPublication>("release") {
                 groupId = "com.ads.detech"
-                artifactId = "detech-nextgen-lib"
-                version = "1.0.8-beta"
+                artifactId = "nextgen-lib"
+                version = "1.0.0"
 
                 from(components["release"])
 

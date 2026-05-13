@@ -1,5 +1,6 @@
 package com.ads.detech
 
+import ads_mobile_sdk.ca
 import android.annotation.SuppressLint
 import android.app.Activity
 import android.app.Dialog
@@ -238,45 +239,55 @@ object AdmobUtils {
     }
     @JvmStatic
     fun adImpressionSolarEngineSDK(adValue: AdValue, adUnitId: String, adFormat: Int, responseInfo : ResponseInfo?){
-        Log.d("==ADSSSS==", "adImpressionSolarEngineSDK: ${responseInfo?.loadedAdSourceResponseInfo?.toString()}")
-        responseInfo?.loadedAdSourceResponseInfo?.toString()
-        TiktokSDKUtils.tiktokTrackEvent()
+        //solar
+        val valueMicros = adValue.valueMicros
+        val currencyCode = adValue.currencyCode
+        val precision = adValue.precisionType
+        val loadedAdapter = responseInfo?.loadedAdSourceResponseInfo
 
+        val adSourceName = loadedAdapter?.name ?: "unknown"
+        val adSourceId = loadedAdapter?.id ?: "unknown"
+        val adSourceInstanceId = loadedAdapter?.instanceId ?: ""
+        val adSourceInstanceName = loadedAdapter?.instanceName ?: ""
+
+        Log.d("==SolarEngine==", "==============================")
+        Log.d("==SolarEngine==", "valueMicros=$valueMicros")
+        Log.d("==SolarEngine==", "currencyCode=$currencyCode")
+        Log.d("==SolarEngine==", "precision=$precision")
+        Log.d("==SolarEngine==", "revenue=${valueMicros / 1_000_000.0}")
+        Log.d("==SolarEngine==", "ecpm=${valueMicros / 1000.0}")
+        Log.d("==SolarEngine==", "adUnitId=$adUnitId")
+        Log.d("==SolarEngine==", "adSourceName=$adSourceName")
+        Log.d("==SolarEngine==", "adSourceInstanceId=$adSourceInstanceId")
+        Log.d("==SolarEngine==", "adSourceInstanceName=$adSourceInstanceName")
+        Log.d("==SolarEngine==", "responseInfo=$responseInfo")
+        Log.d("==SolarEngine==", "==============================")
+
+        val model = SEAdImpEventModel()
+        model.setAdNetworkPlatform(adSourceName)
+        model.setMediationPlatform("admob")
+        model.setAdType(adFormat)
+        model.setAdNetworkAppID(adSourceId) // hoặc SolarEngine appKey nếu doc/project yêu cầu
+        model.setAdNetworkADID(adUnitId)
+        model.setEcpm(valueMicros / 1000.0)
+        model.setCurrencyType(currencyCode)
+        model.setRenderSuccess(true)
+
+        SolarEngineManager.getInstance().trackAdImpression(model)
+    }
+
+
+    fun adImpressionTenjin(adValue: AdValue, adUnitId: String, adFormat: Int, responseInfo : ResponseInfo?){
         val valueMicros: Long = adValue.valueMicros
         val currencyCode: String = adValue.currencyCode
-        Log.d("==SolarEngine==", "adImpressionSolarEngineSDK: $valueMicros")
-        // Get the ad unit ID.
         val adSourceName: String = responseInfo?.loadedAdSourceResponseInfo?.name.toString()
         val adSourceId: String = responseInfo?.loadedAdSourceResponseInfo?.id.toString()
-        //SE SDK processing logic
-        val seAdImpEventModel = SEAdImpEventModel()
-        //Monetization Platform Name
-        seAdImpEventModel.setAdNetworkPlatform(adSourceName)
-        //Mediation Platform Name (e.g. admob SDK as "admob")
-        seAdImpEventModel.setMediationPlatform("admob")
-        //Displayed Ad Type (Taking Rewarded Ad as an example, adType = 1)
-        seAdImpEventModel.setAdType(adFormat)
-        //Monetization Platform App ID
-        seAdImpEventModel.setAdNetworkAppID(adSourceId)
-        //Monetization Platform Ad Unit ID
-        seAdImpEventModel.setAdNetworkADID(adUnitId)
-        //Ad eCPM
-        seAdImpEventModel.setEcpm((valueMicros / 1000).toDouble())
-        //Monetization Platform Currency Type
-        seAdImpEventModel.setCurrencyType(currencyCode)
-        //True: rendered success
-        seAdImpEventModel.setRenderSuccess(true)
-        //You can add custom properties as needed. Here we do m not give examples.
-        SolarEngineManager.getInstance().trackAdImpression(seAdImpEventModel)
-
         val adRevenueJson = JSONObject()
-
         val value = adValue.valueMicros
         val precisionType = adValue.precisionType
         val adUnitId = adUnitId
         var adSourceInstanceName = ""
         var adSourceInstanceId = ""
-
         responseInfo?.loadedAdSourceResponseInfo?.let {
             adSourceInstanceName = it.instanceName
             adSourceInstanceId = it.instanceId
@@ -311,15 +322,16 @@ object AdmobUtils {
                     "ads"
                 }
             }
+            adRevenueJson.put("ad_format", adFormat2)
             TenjinSDKUtil.instance?.eventAdImpressionAdMob(adRevenueJson)
             // banner / interstitial / rewarded / rewarded_interstitial / native / splash
-            adRevenueJson.put("ad_format", adFormat2)
-        } catch (e: JSONException) {
+
+        } catch (e: Exception) {
             e.printStackTrace()
         }
 // Make sure the App Events SDK has been initialized before calling this
-        val adRevenueInfo: TTBaseEvent = TTAdRevenueEvent.newBuilder(adRevenueJson).build()
-        TikTokBusinessSdk.trackTTEvent(adRevenueInfo)
+//        val adRevenueInfo: TTBaseEvent = TTAdRevenueEvent.newBuilder(adRevenueJson).build()
+//        TikTokBusinessSdk.trackTTEvent(adRevenueInfo)
     }
 
     fun initListIdTest() {
@@ -399,7 +411,9 @@ object AdmobUtils {
                                 super.onAdPaid(value)
                                 runOnMainThread {
                                     adImpressionSolarEngineSDK(value,bannerId,AdType.Banner.value,ad.getResponseInfo())
+                                    adImpressionTenjin(value,bannerId,AdType.Banner.value,ad.getResponseInfo())
                                     adImpressionFacebookSDK(activity,value)
+                                    bannerAdCallback.onPaid(value,mAdView)
                                 }
                             }
                         }
@@ -503,7 +517,9 @@ object AdmobUtils {
                                 super.onAdPaid(value)
                                 runOnMainThread {
                                     adImpressionSolarEngineSDK(value,bannerId,AdType.Banner.value,ad.getResponseInfo())
+                                    adImpressionTenjin(value,bannerId,AdType.Banner.value,ad.getResponseInfo())
                                     adImpressionFacebookSDK(activity,value)
+                                    callback.onAdPaid(value, banner.mAdView!!)
                                 }
                             }
                         }
@@ -614,8 +630,9 @@ object AdmobUtils {
                                                 }
                                             }
                                             adImpressionSolarEngineSDK(value, nativeHolder.ads,native_type,nativeAd.getResponseInfo())
-                                            nativeAdmobCallback.onPaid(value, nativeHolder.ads)
+                                            adImpressionTenjin(value, nativeHolder.ads,native_type,nativeAd.getResponseInfo())
                                             adImpressionFacebookSDK(context,value)
+                                            nativeAdmobCallback.onPaid(value, nativeHolder.ads)
                                         }
                                     }
                                 }
@@ -705,6 +722,7 @@ object AdmobUtils {
                                         }
                                     }
                                     adImpressionSolarEngineSDK(value, nativeHolder.ads,native_type,nativeHolder.nativeAd?.getResponseInfo())
+                                    adImpressionTenjin(value, nativeHolder.ads,native_type,nativeHolder.nativeAd?.getResponseInfo())
                                     adImpressionFacebookSDK(activity,value)
                                     callback.onPaid(value, nativeHolder.ads)
                                 }
@@ -773,6 +791,7 @@ object AdmobUtils {
                                             }
                                         }
                                         adImpressionSolarEngineSDK(value, nativeHolder.ads,native_type,nativeHolder.nativeAd?.getResponseInfo())
+                                        adImpressionTenjin(value, nativeHolder.ads,native_type,nativeHolder.nativeAd?.getResponseInfo())
                                         adImpressionFacebookSDK(activity,value)
                                         callback.onPaid(value, nativeHolder.ads)
                                     }
@@ -850,7 +869,9 @@ object AdmobUtils {
                                         }
                                     }
                                     adImpressionSolarEngineSDK(value, nativeHolder.ads,native_type,nativeHolder.nativeAd?.getResponseInfo())
+                                    adImpressionTenjin(value, nativeHolder.ads,native_type,nativeHolder.nativeAd?.getResponseInfo())
                                     adImpressionFacebookSDK(activity,value)
+                                    callback.onAdPaid(value, nativeHolder.ads)
                                 }
                             }
                         }
@@ -916,7 +937,9 @@ object AdmobUtils {
                                             }
                                         }
                                         adImpressionSolarEngineSDK(value, nativeHolder.ads,native_type,nativeHolder.nativeAd?.getResponseInfo())
+                                        adImpressionTenjin(value, nativeHolder.ads,native_type,nativeHolder.nativeAd?.getResponseInfo())
                                         adImpressionFacebookSDK(activity,value)
+                                        callback.onAdPaid(value, nativeHolder.ads)
                                     }
                                 }
                             }
@@ -1056,7 +1079,7 @@ object AdmobUtils {
                                     }
                                 }
                             }
-                        nativeHolder.nativeAd?.apply {
+                        nativeAd.apply {
                             this.adEventCallback =
                                 object : NativeAdEventCallback {
                                     override fun onAdImpression() {
@@ -1067,13 +1090,15 @@ object AdmobUtils {
                                         runOnMainThread {
                                             Log.d(TAG, "Native ad onPaidEvent: ${value.valueMicros} ${value.currencyCode}")
                                             var native_type = AdType.Native.value
-                                            nativeHolder.nativeAd?.let { it1 ->
+                                            nativeAd.let { it1 ->
                                                 if (it1.mediaContent.hasVideoContent){
                                                     native_type = AdType.NativeVideo.value
                                                 }
                                             }
-                                            adImpressionSolarEngineSDK(value, nativeHolder.ads,native_type,nativeHolder.nativeAd?.getResponseInfo())
+                                            adImpressionSolarEngineSDK(value, nativeHolder.ads,native_type,nativeAd.getResponseInfo())
+                                            adImpressionTenjin(value, nativeHolder.ads,native_type,nativeAd.getResponseInfo())
                                             adImpressionFacebookSDK(activity,value)
+                                            adCallback.onAdPaid(value, nativeHolder.ads)
                                         }
                                     }
                                 }
@@ -1229,7 +1254,9 @@ object AdmobUtils {
                                                 }
                                             }
                                             adImpressionSolarEngineSDK(value, nativeHolder.ads,native_type,nativeAd.getResponseInfo())
+                                            adImpressionTenjin(value, nativeHolder.ads,native_type,nativeAd.getResponseInfo())
                                             adImpressionFacebookSDK(activity,value)
+                                            nativeAdCallbackCollapsible.onAdPaid(value, nativeHolder.ads)
                                         }
                                     }
                                 }
@@ -1372,7 +1399,9 @@ object AdmobUtils {
                                         super.onAdPaid(value)
                                         runOnMainThread {
                                             adImpressionSolarEngineSDK(value, admobId,AdType.Interstitial.value,mInterstitialAd?.getResponseInfo())
+                                            adImpressionTenjin(value, admobId,AdType.Interstitial.value,mInterstitialAd?.getResponseInfo())
                                             adImpressionFacebookSDK(activity, value)
+                                            adCallback.onPaid(value,admobId)
                                         }
                                     }
                                 }
@@ -1516,7 +1545,9 @@ object AdmobUtils {
                                             "Interstitial ad onPaidEvent: ${value.valueMicros} ${value.currencyCode}",
                                         )
                                         adImpressionSolarEngineSDK(value, AD_UNIT_ID,AdType.Interstitial.value,ad.getResponseInfo())
+                                        adImpressionTenjin(value, AD_UNIT_ID,AdType.Interstitial.value,ad.getResponseInfo())
                                         adImpressionFacebookSDK(activity, value)
+                                        adCallback.onPaid(value,admobHolder.ads)
                                     }
                                 }
                             }
@@ -1578,7 +1609,9 @@ object AdmobUtils {
                                             "Interstitial ad onPaidEvent: ${value.valueMicros} ${value.currencyCode}",
                                         )
                                         adImpressionSolarEngineSDK(value, AD_UNIT_ID,AdType.Interstitial.value,ad.getResponseInfo())
+                                        adImpressionTenjin(value, AD_UNIT_ID,AdType.Interstitial.value,ad.getResponseInfo())
                                         adImpressionFacebookSDK(activity, value)
+                                        adCallback.onPaid(value,admobHolder.ads)
                                     }
                                 }
                             }
@@ -1643,7 +1676,9 @@ object AdmobUtils {
                                         "Interstitial ad onPaidEvent: ${value.valueMicros} ${value.currencyCode}",
                                     )
                                     adImpressionSolarEngineSDK(value, AD_UNIT_ID,AdType.Interstitial.value,ad.getResponseInfo())
+                                    adImpressionTenjin(value, AD_UNIT_ID,AdType.Interstitial.value,ad.getResponseInfo())
                                     adImpressionFacebookSDK(activity, value)
+                                    adCallback.onPaid(value,AD_UNIT_ID)
                                 }
                             }
                         }
@@ -1705,7 +1740,9 @@ object AdmobUtils {
                                             "Interstitial ad onPaidEvent: ${value.valueMicros} ${value.currencyCode}",
                                         )
                                         adImpressionSolarEngineSDK(value, AD_UNIT_ID,AdType.Interstitial.value,ad.getResponseInfo())
+                                        adImpressionTenjin(value, AD_UNIT_ID,AdType.Interstitial.value,ad.getResponseInfo())
                                         adImpressionFacebookSDK(activity, value)
+                                        adCallback.onPaid(value,AD_UNIT_ID)
                                     }
                                 }
                             }
@@ -1896,7 +1933,9 @@ object AdmobUtils {
                                     super.onAdPaid(value)
                                     runOnMainThread {
                                         adImpressionSolarEngineSDK(value, admobId!!,AdType.RewardVideo.value,ad.getResponseInfo())
+                                        adImpressionTenjin(value, admobId!!,AdType.RewardVideo.value,ad.getResponseInfo())
                                         adImpressionFacebookSDK(activity, value)
+                                        adCallback2.onPaid(value,admobId)
                                     }
                                 }
                             }
@@ -2040,7 +2079,9 @@ object AdmobUtils {
                                     super.onAdPaid(value)
                                     runOnMainThread {
                                         adImpressionSolarEngineSDK(value, admobId!!,AdType.RewardVideo.value,ad.getResponseInfo())
+                                        adImpressionTenjin(value, admobId!!,AdType.RewardVideo.value,ad.getResponseInfo())
                                         adImpressionFacebookSDK(activity, value)
+                                        adCallback2.onPaid(value,admobId)
                                     }
                                 }
                             }
@@ -2186,7 +2227,9 @@ object AdmobUtils {
                                                 }
                                             }
                                             adImpressionSolarEngineSDK(value, nativeHolder.ads,native_type,nativeAd.getResponseInfo())
+                                            adImpressionTenjin(value, nativeHolder.ads,native_type,nativeAd.getResponseInfo())
                                             adImpressionFacebookSDK(context,value)
+                                            adCallback.onAdPaid(value,nativeHolder.ads)
                                         }
                                     }
                                 }
@@ -2281,7 +2324,9 @@ object AdmobUtils {
                                                 }
                                             }
                                             adImpressionSolarEngineSDK(value, nativeHolder.ads,native_type,nativeAd.getResponseInfo())
+                                            adImpressionTenjin(value, nativeHolder.ads,native_type,nativeAd.getResponseInfo())
                                             adImpressionFacebookSDK(context,value)
+                                            adCallback.onAdPaid(value,nativeHolder.ads)
                                         }
                                     }
 
@@ -2376,6 +2421,7 @@ object AdmobUtils {
                                         }
                                     }
                                     adImpressionSolarEngineSDK(value, nativeHolder.ads,native_type,nativeHolder.nativeAd?.getResponseInfo())
+                                    adImpressionTenjin(value, nativeHolder.ads,native_type,nativeHolder.nativeAd?.getResponseInfo())
                                     adImpressionFacebookSDK(activity,value)
                                     callback.onPaid(value, nativeHolder.ads)
                                 }
@@ -2442,6 +2488,7 @@ object AdmobUtils {
                                             }
                                         }
                                         adImpressionSolarEngineSDK(value, nativeHolder.ads,native_type,nativeHolder.nativeAd?.getResponseInfo())
+                                        adImpressionTenjin(value, nativeHolder.ads,native_type,nativeHolder.nativeAd?.getResponseInfo())
                                         adImpressionFacebookSDK(activity,value)
                                         callback.onPaid(value, nativeHolder.ads)
                                     }

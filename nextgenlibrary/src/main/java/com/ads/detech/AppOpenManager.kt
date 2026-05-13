@@ -591,6 +591,12 @@ class AppOpenManager private constructor() :
                                     )
 
                                     currentActivity?.let {
+                                        AdmobUtils.adImpressionTenjin(
+                                            adValue,
+                                            appResumeAdId ?: "",
+                                            AdType.Splash.value,
+                                            ad.getResponseInfo()
+                                        )
                                         AdmobUtils.adImpressionFacebookSDK(
                                             it,
                                             adValue

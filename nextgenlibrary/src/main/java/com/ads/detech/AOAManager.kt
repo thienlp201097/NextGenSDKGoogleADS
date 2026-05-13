@@ -13,6 +13,7 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
 import com.ads.detech.AdmobUtils.adImpressionSolarEngineSDK
+import com.ads.detech.AdmobUtils.adImpressionTenjin
 import com.ads.detech.ads.AdsHolder.TAG
 import com.airbnb.lottie.LottieAnimationView
 import com.google.android.libraries.ads.mobile.sdk.common.AdRequest
@@ -191,6 +192,7 @@ class AOAManager(private val activity: Activity,val appOpen: String,val timeOut:
                             super.onAdPaid(value)
                             runOnMainThread {
                                 adImpressionSolarEngineSDK(value,appOpen, AdType.Splash.value,appOpenAd?.getResponseInfo())
+                                adImpressionTenjin(value,appOpen, AdType.Splash.value,appOpenAd?.getResponseInfo())
                                 appOpenAdsListener.onAdPaid(value, appOpen)
                             }
                         }
